@@ -7,4 +7,4 @@
 
 
 
-  This final project will contains parallel implementation of Dijkstra's Shortest Path Algorithm in NVIDIA CUDA and performance comparison with OpenACC implementation.
+  This final project will contains parallelizing the Dijkstra's Shortest Path Algorithm in NVIDIA CUDA and performance comparison with OpenACC implementation.
