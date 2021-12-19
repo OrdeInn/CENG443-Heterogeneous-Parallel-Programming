@@ -95,6 +95,8 @@ int main(){
         parent_vertice[i] = -1;
     }
 
+    distance[start] = 0;
+
 	cudaError_t err = cudaSuccess;
 
 	int size = MAX  * sizeof(int);
@@ -189,10 +191,10 @@ int main(){
 	// Copy the device result vector in device memory to the host result vector
     // in host memory.
     err = cudaMemcpy(distance, d_distance, size, cudaMemcpyDeviceToHost);
+    err = cudaMemcpy(parent_vertice, d_parent_vertice, size, cudaMemcpyDeviceToHost);
 
 
     // Print execution time
-
     cudaEventSynchronize(e_stop);
     float milliseconds = 0;
     cudaEventElapsedTime(&milliseconds, e_start, e_stop);
