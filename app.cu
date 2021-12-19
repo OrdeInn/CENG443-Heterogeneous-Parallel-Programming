@@ -161,6 +161,14 @@ int main(){
     dim3 blocks(1, 1);
 
 
+	//Measure execution Time
+    cudaEvent_t e_start, e_stop;
+    cudaEventCreate(&e_start);
+    cudaEventCreate(&e_stop);
+
+    cudaEventRecord(e_start);
+
+
 	kernel_dijkstra<<<blocks, threads>>>(d_graph, d_cost, d_distance, d_pred, d_visited, n, start);
 
     err = cudaGetLastError();
@@ -171,9 +179,21 @@ int main(){
         exit(EXIT_FAILURE);
     }
 
+    cudaEventRecord(e_stop);
+
+
 	// Copy the device result vector in device memory to the host result vector
     // in host memory.
     err = cudaMemcpy(distance, d_distance, size, cudaMemcpyDeviceToHost);
+
+
+	// Print execution time
+    cudaEventSynchronize(e_stop);
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, e_start, e_stop);
+
+    printf("\napp executed in %f milliseconds", milliseconds);
+
 
 
 	// Printing the distance

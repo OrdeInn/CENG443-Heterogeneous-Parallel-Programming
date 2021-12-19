@@ -161,11 +161,22 @@ int main(){
     dim3 gridRelax(MAX / THREADS_BLOCK, 1);
     dim3 blockRelax(THREADS_BLOCK, 1);
 
+
+    //Measure execution Time
+    cudaEvent_t e_start, e_stop;
+    cudaEventCreate(&e_start);
+    cudaEventCreate(&e_stop);
+
+    cudaEventRecord(e_start);
+
+
     for(int i = 0; i < n; i++){
 
         findClosestVertice<<<blocks, threads>>>(d_distance, d_visited, d_closest, n);
         relaxEdges<<<gridRelax, blockRelax>>>(d_graph, d_distance, d_parent_vertice, d_visited, d_closest);
     }
+
+    cudaEventRecord(e_stop);
 
     err = cudaGetLastError();
 
@@ -179,6 +190,14 @@ int main(){
     // in host memory.
     err = cudaMemcpy(distance, d_distance, size, cudaMemcpyDeviceToHost);
 
+
+    // Print execution time
+
+    cudaEventSynchronize(e_stop);
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, e_start, e_stop);
+
+    printf("\napp_v2 executed in %f milliseconds", milliseconds);
 
 	// Printing the distance
  	printf("\nVertex \t Distance from Source\n");
