@@ -5,10 +5,12 @@
 #include <stdbool.h>
 
 // Number of vertices in the graph
-#define MAX 9
+#define MAX pow(2, 28)
 #define INF 99999
 #define THREADS_BLOCK 1
 
+int n;
+int* graph;
 
 __global__ void findClosestVertice(int* distance, int* visited, int* global_closest, int num_vertices) {
     
@@ -29,12 +31,12 @@ __global__ void findClosestVertice(int* distance, int* visited, int* global_clos
     visited[vertice] = 1;
 }
 
-__global__ void relaxEdges(int* graph, int* distance, int* parent_node, int* visited, int* global_closest) {
+__global__ void relaxEdges(int* graph, int* distance, int* parent_node, int* visited, int* global_closest, int n) {
 
     int next = blockIdx.x * blockDim.x + threadIdx.x;
     int source = global_closest[0];
 
-    int edge = graph[source * MAX + next];
+    int edge = graph[source * n + next];
     int new_dist = distance[source] + edge;
 
     if ((edge != 0) && (visited[next] != 1) && (new_dist < distance[next])) {
@@ -45,36 +47,58 @@ __global__ void relaxEdges(int* graph, int* distance, int* parent_node, int* vis
 
 }
 
+void read_data(char *file_data){
+    
+    FILE *file; 
+    file = fopen("data.txt", "r");
+    
+    if ( file == NULL ){
+        printf( "data.txt file failed to open.\n" ) ;
+    }
+    else{
+
+        fgets (file_data, MAX, file);
+        fclose(file) ;
+    }
+}
+
+void init(){
+
+    char  *file_data = (char * )malloc(MAX * sizeof(char));
+    read_data(file_data);
+
+    char *parsed_num = strtok(file_data," ");
+
+    int i = 0;
+
+    while (parsed_num != NULL){
+
+        if(i == 0){
+
+            n = atoi(parsed_num);
+            graph = (int*) malloc(n * n * sizeof(int));
+        }else{
+
+            graph[i-1] = atoi(parsed_num);
+        }
+        
+        i++;
+        parsed_num = strtok(NULL, " ");
+    }
+}
+
 
 
 int main(){
 
-	int n = 9;
 	int start = 0;
 
-	int* graph = (int*) malloc(MAX * MAX * sizeof(int));
-	int* distance = (int*) malloc(MAX * sizeof(int));
-	int* visited = (int*) malloc(MAX * sizeof(int));
-    int* parent_vertice = (int*) malloc(MAX * sizeof(int));
+    init();
+
+	int* distance = (int*) malloc(n * sizeof(int));
+	int* visited = (int*) malloc(n * sizeof(int));
+    int* parent_vertice = (int*) malloc(n * sizeof(int));
 	
-    int Graph[9][9] = { { 0, 4, 0, 0, 0, 0, 0, 8, 0 },
-                        { 4, 0, 8, 0, 0, 0, 0, 11, 0 },
-                        { 0, 8, 0, 7, 0, 4, 0, 0, 2 },
-                        { 0, 0, 7, 0, 9, 14, 0, 0, 0 },
-                        { 0, 0, 0, 9, 0, 10, 0, 0, 0 },
-                        { 0, 0, 4, 14, 10, 0, 2, 0, 0 },
-                        { 0, 0, 0, 0, 0, 2, 0, 1, 6 },
-                        { 8, 11, 0, 0, 0, 0, 1, 0, 7 },
-                        { 0, 0, 2, 0, 0, 0, 6, 7, 0 } }; 
-
-
-	for(int j=0 ; j < n; j++){
-
-		for(int i = 0; i < n; i++){
-
-			graph[i + (j*n)] = Graph[j][i];
-		}
-	}
 
 	for (int i = 0; i < n; i++) {
 
@@ -99,10 +123,10 @@ int main(){
 
 	cudaError_t err = cudaSuccess;
 
-	int size = MAX  * sizeof(int);
+	int size = n  * sizeof(int);
 
 	int *d_graph = NULL;
-    err = cudaMalloc((void **)&d_graph, MAX * MAX * sizeof(int));
+    err = cudaMalloc((void **)&d_graph, n * n * sizeof(int));
 
 	if (err != cudaSuccess){
 
@@ -146,7 +170,7 @@ int main(){
        	exit(EXIT_FAILURE);
     }
 
-	err = cudaMemcpy(d_graph, graph, MAX * MAX * sizeof(int), cudaMemcpyHostToDevice);
+	err = cudaMemcpy(d_graph, graph, n * n * sizeof(int), cudaMemcpyHostToDevice);
 	err = cudaMemcpy(d_distance, distance, size, cudaMemcpyHostToDevice);
 	err = cudaMemcpy(d_visited, visited, size, cudaMemcpyHostToDevice);
 	err = cudaMemcpy(d_parent_vertice, parent_vertice, size, cudaMemcpyHostToDevice);
@@ -160,7 +184,7 @@ int main(){
 	dim3 threads(1, 1);
     dim3 blocks(1, 1);
 
-    dim3 gridRelax(MAX / THREADS_BLOCK, 1);
+    dim3 gridRelax(n / THREADS_BLOCK, 1);
     dim3 blockRelax(THREADS_BLOCK, 1);
 
 
@@ -175,7 +199,7 @@ int main(){
     for(int i = 0; i < n; i++){
 
         findClosestVertice<<<blocks, threads>>>(d_distance, d_visited, d_closest, n);
-        relaxEdges<<<gridRelax, blockRelax>>>(d_graph, d_distance, d_parent_vertice, d_visited, d_closest);
+        relaxEdges<<<gridRelax, blockRelax>>>(d_graph, d_distance, d_parent_vertice, d_visited, d_closest, n);
     }
 
     cudaEventRecord(e_stop);
@@ -199,14 +223,16 @@ int main(){
     float milliseconds = 0;
     cudaEventElapsedTime(&milliseconds, e_start, e_stop);
 
-    printf("\napp_v2 executed in %f milliseconds", milliseconds);
+    printf("\napp_v2 executed for %dx%d matrix in %f milliseconds\n", n, n, milliseconds);
 
+    /*
 	// Printing the distance
  	printf("\nVertex \t Distance from Source\n");
     for (int i = 0; i < n; i++){
         printf("%d\t\t%d\n", i, distance[i]);
 	}
-    	
+    */
+
 	//Free gpu memories
     cudaFree(d_graph);
     cudaFree(d_distance);

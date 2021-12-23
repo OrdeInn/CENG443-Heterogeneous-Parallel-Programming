@@ -5,8 +5,12 @@
 #include <stdbool.h>
 
 // Number of vertices in the graph
-#define MAX 9
+#define MAX pow(2, 28)
 #define INF 99999
+#define THREADS_BLOCK 1
+
+int n;
+int* graph;
 
 
 __global__ void kernel_dijkstra(int* graph, int* cost, int* distance, int* predecessor, int* visited, int n, int start){
@@ -48,36 +52,56 @@ __global__ void kernel_dijkstra(int* graph, int* cost, int* distance, int* prede
 	}		
 }
 
-int main(){
+void read_data(char *file_data){
+    
+    FILE *file; 
+    file = fopen("data.txt", "r");
+    
+    if ( file == NULL ){
+        printf( "data.txt file failed to open.\n" ) ;
+    }
+    else{
 
-	int n = 9;
+        fgets (file_data, MAX, file);
+        fclose(file) ;
+    }
+}
+
+void init(){
+
+    char  *file_data = (char * )malloc(MAX * sizeof(char));
+    read_data(file_data);
+
+    char *parsed_num = strtok(file_data," ");
+
+    int i = 0;
+
+    while (parsed_num != NULL){
+
+        if(i == 0){
+
+            n = atoi(parsed_num);
+            graph = (int*) malloc(n * n * sizeof(int));
+        }else{
+
+            graph[i-1] = atoi(parsed_num);
+        }
+        
+        i++;
+        parsed_num = strtok(NULL, " ");
+    }
+}
+
+int main(){
 	int start = 0;
 
-	int* graph = (int*) malloc(MAX * MAX * sizeof(int));
-	int* distance = (int*) malloc(MAX * sizeof(int));
-	int* pred = (int*) malloc(MAX * sizeof(int));
-	int* visited = (int*) malloc(MAX * sizeof(int));
+	init();
 
-	int* cost = (int*) malloc(MAX * MAX * sizeof(int));
+	int* distance = (int*) malloc(n * sizeof(int));
+	int* pred = (int*) malloc(n * sizeof(int));
+	int* visited = (int*) malloc(n * sizeof(int));
 
-	int Graph[9][9] = { { 0, 4, 0, 0, 0, 0, 0, 8, 0 },
-                        { 4, 0, 8, 0, 0, 0, 0, 11, 0 },
-                        { 0, 8, 0, 7, 0, 4, 0, 0, 2 },
-                        { 0, 0, 7, 0, 9, 14, 0, 0, 0 },
-                        { 0, 0, 0, 9, 0, 10, 0, 0, 0 },
-                        { 0, 0, 4, 14, 10, 0, 2, 0, 0 },
-                        { 0, 0, 0, 0, 0, 2, 0, 1, 6 },
-                        { 8, 11, 0, 0, 0, 0, 1, 0, 7 },
-                        { 0, 0, 2, 0, 0, 0, 6, 7, 0 } }; 
-
-
-	for(int j=0 ; j < n; j++){
-
-		for(int i = 0; i < n; i++){
-
-			graph[i + (j*n)] = Graph[j][i];
-		}
-	}
+	int* cost = (int*) malloc(n * n * sizeof(int));
 	
 	 // Creating cost matrix
 	for (int i = 0; i < n; i++)
@@ -95,10 +119,10 @@ int main(){
 
 	cudaError_t err = cudaSuccess;
 
-	int size = MAX  * sizeof(int);
+	int size = n  * sizeof(int);
 
 	int *d_graph = NULL;
-    err = cudaMalloc((void **)&d_graph, MAX * MAX * sizeof(int));
+    err = cudaMalloc((void **)&d_graph, n * n * sizeof(int));
 
 	if (err != cudaSuccess){
 
@@ -136,7 +160,7 @@ int main(){
 
 
 	int *d_cost = NULL;
-    err = cudaMalloc((void **)&d_cost, MAX * MAX * sizeof(int));
+    err = cudaMalloc((void **)&d_cost, n * n * sizeof(int));
 
 	if (err != cudaSuccess){
 
@@ -145,11 +169,11 @@ int main(){
     }
 
 
-	err = cudaMemcpy(d_graph, graph, MAX * MAX * sizeof(int), cudaMemcpyHostToDevice);
+	err = cudaMemcpy(d_graph, graph, n * n * sizeof(int), cudaMemcpyHostToDevice);
 	err = cudaMemcpy(d_distance, distance, size, cudaMemcpyHostToDevice);
 	err = cudaMemcpy(d_pred, pred, size, cudaMemcpyHostToDevice);
 	err = cudaMemcpy(d_visited, visited, size, cudaMemcpyHostToDevice);
-	err = cudaMemcpy(d_cost, cost, MAX * MAX * sizeof(int), cudaMemcpyHostToDevice);
+	err = cudaMemcpy(d_cost, cost, n * n * sizeof(int), cudaMemcpyHostToDevice);
 
 	 if (err != cudaSuccess)
     {
@@ -192,15 +216,16 @@ int main(){
     float milliseconds = 0;
     cudaEventElapsedTime(&milliseconds, e_start, e_stop);
 
-    printf("\napp executed in %f milliseconds", milliseconds);
+    printf("\napp v1 executed for %dx%d matrix in %f milliseconds\n", n, n, milliseconds);
 
 
-
+	/*
 	// Printing the distance
  	printf("\nVertex \t Distance from Source\n");
     for (int i = 0; i < n; i++){
         printf("%d\t\t%d\n", i, distance[i]);
 	}
+	*/
     	
 	//Free gpu memories
     cudaFree(d_graph);
