@@ -7,7 +7,7 @@
 // Number of vertices in the graph
 #define MAX pow(2, 28)
 #define INF 99999
-#define THREADS_BLOCK 1
+#define THREADS_BLOCK 32
 
 int n;
 int* graph;
@@ -184,9 +184,6 @@ int main(){
 	dim3 threads(1, 1);
     dim3 blocks(1, 1);
 
-    dim3 gridRelax(n / THREADS_BLOCK, 1);
-    dim3 blockRelax(THREADS_BLOCK, 1);
-
 
     //Measure execution Time
     cudaEvent_t e_start, e_stop;
@@ -199,7 +196,7 @@ int main(){
     for(int i = 0; i < n; i++){
 
         findClosestVertice<<<blocks, threads>>>(d_distance, d_visited, d_closest, n);
-        relaxEdges<<<gridRelax, blockRelax>>>(d_graph, d_distance, d_parent_vertice, d_visited, d_closest, n);
+        relaxEdges<<<blocks, threads>>>(d_graph, d_distance, d_parent_vertice, d_visited, d_closest, n);
     }
 
     cudaEventRecord(e_stop);
